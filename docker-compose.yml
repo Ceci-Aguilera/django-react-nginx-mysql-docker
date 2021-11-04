@@ -1,0 +1,66 @@
+version: "3.7"
+
+services:
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    # container_name: 'Ceci-Django_Backend'
+    volumes:
+      - django_static_volume:/usr/src/app/static
+    hostname: backend
+    expose:
+      - 8000
+    command: gunicorn django_backend.wsgi:application --bind 0.0.0.0:8000
+    links:
+      - database
+  database:
+    image: mysql:8
+    command: --default-authentication-plugin=mysql_native_password
+    container_name: '${COMPOSE_PROJECT_NAME}-${DATABASE}'
+    restart: 'always'
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 'root'
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_HOST: '%'
+    expose:
+      - '3306'
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:
+        - API_SERVER=${ENV_API_SERVER}
+    volumes:
+      - react_static_volume:/usr/src/app/build/static
+    hostname: frontend
+    expose:
+      - 3000
+    env_file:
+      - .env
+    command: serve -s build -l 3000
+    links:
+      - backend
+
+  nginx:
+    restart: always
+    build: ./Nginx
+    volumes:
+      - django_static_volume:/usr/src/app/django_files/static
+      - react_static_volume:/usr/src/app/react_files/static
+    ports:
+      - 80:80
+    links:
+      - frontend
+
+
+volumes:
+  mysql_data:
+  django_static_volume:
+  react_static_volume:
